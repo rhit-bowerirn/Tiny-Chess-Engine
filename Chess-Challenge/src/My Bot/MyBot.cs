@@ -1,30 +1,45 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using ChessChallenge.API;
 
+
 public class MyBot : IChessBot
 {
+
+    Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
+
+    // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
+    // This is used to find all the pieces that control a given square
+    // En passant doesn't need to be accounted for here
+    private Board ScapeGoat(string fen, Square square, bool pieceIsWhite)
+    {
+        string[] rows = fen.Split('/');
+        StringBuilder newRow = new(Regex.Replace(rows[7 - square.Rank], @"\d+", match => new string('1', int.Parse(match.Value))));
+        newRow[square.File] = pieceIsWhite ? 'B' : 'b';
+        rows[7 - square.Rank] = Regex.Replace(newRow.ToString(), "1+", match => match.Value.Length.ToString());
+        return Board.CreateBoardFromFEN(string.Join("/", rows));
+    }
+
     public Move Think(Board board, Timer timer)
     {
-        int[] material = { 0, 1, 3, 3, 5, 9, 10 };
         Move[] moves = board.GetLegalMoves();
         int[] moveEvals = new int[moves.Length];
         int maxValue = -10000;
-
         string currentFen = board.GetFenString();
+        bool isWhite = board.IsWhiteToMove;
 
 
         for (int i = 0; i < moves.Length; i++)
         {
             Move move = moves[i];
 
-            //we relinquish control of the square we move to and risk our material (I added material of capture piece and promotion)
-            int value = -1 * material[(int)move.MovePieceType] + 2 * material[(int)move.CapturePieceType];
+            //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
+            int value = -1 * Material(move.MovePieceType) + 2 * Material(move.CapturePieceType);
             if (move.MovePieceType == PieceType.Pawn)
             {
-                if (board.IsWhiteToMove)
+                if (isWhite)
                 {
                     value += move.TargetSquare.Rank;
                 }
@@ -36,7 +51,7 @@ public class MyBot : IChessBot
             }
 
             //Calculate our control of the square
-            Board attackChecker = ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove);
+            Board attackChecker = ScapeGoat(currentFen, move.TargetSquare, !isWhite);
             foreach (Move m in attackChecker.GetLegalMoves())
             {
                 if (m.TargetSquare.Equals(move.TargetSquare))
@@ -44,6 +59,7 @@ public class MyBot : IChessBot
                     value += 10;
                 }
             }
+
 
             board.MakeMove(move);
 
@@ -70,43 +86,7 @@ public class MyBot : IChessBot
                 board.UndoMove(opponentMove);
             }
 
-            board.ForceSkipTurn();
-
-            //find new threats we create
-            foreach (Move newMove in board.GetLegalMoves())
-            {
-                if (newMove.StartSquare == move.TargetSquare && newMove.IsCapture)
-                {
-                    value += material[(int)newMove.CapturePieceType];
-                }
-            }
-
-            //find all the pieces we defend now
-            string hypotheticalFen = board.GetFenString();
-            PieceList[] pieces = board.GetAllPieceLists();
-            foreach (PieceList pl in pieces)
-            {
-                if (pl.IsWhitePieceList == board.IsWhiteToMove)
-                {
-                    for (int index = 0; index < pl.Count; index++)
-                    {
-                        Piece p = pl.GetPiece(index);
-                        if (!p.IsKing && !(p.Square == move.TargetSquare))
-                        {
-                            Board defenseChecker = ScapeGoat(hypotheticalFen, p.Square, !p.IsWhite);
-                            foreach (Move defence in defenseChecker.GetLegalMoves())
-                            {
-                                if (defence.StartSquare.Index == move.TargetSquare.Index && defence.TargetSquare.Index == p.Square.Index)
-                                {
-                                    value += material[(int)p.PieceType];
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            board.UndoSkipTurn();
+            value += CalculateFuturePlans(board, move);
 
             board.UndoMove(move);
             moveEvals[i] = value;
@@ -116,31 +96,53 @@ public class MyBot : IChessBot
             }
         }
 
-        //pick a random move
-        List<Move> viableMoves = new();
-        for (int i = 0; i < moves.Length; i++)
+        //pick a random top move
+        return moves.Where((move, i) => moveEvals[i] == maxValue).OrderBy(_ => Guid.NewGuid()).First();
+    }
+
+
+
+
+    // ***Assumes the move has already been made on the board***
+    // This is where we skip our opponents next turn to see how our move affects us
+    private int CalculateFuturePlans(Board board, Move move)
+    {
+        Square currentSquare = move.TargetSquare;
+        board.ForceSkipTurn();
+
+        int totalConsequence = board.GetLegalMoves()
+            .Where(threat => threat.StartSquare == currentSquare)
+            .Sum(threat => Material(threat.CapturePieceType));
+
+        //find all the pieces we defend now
+        //TODO: clean up
+        string hypotheticalFen = board.GetFenString();
+        PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
+        foreach (PieceList pieceList in pieceLists)
         {
-            if (moveEvals[i] == maxValue)
+            for (int i = 0; i < pieceList.Count; i++)
             {
-                viableMoves.Add(moves[i]);
+                Piece p = pieceList.GetPiece(i);
+                if (!p.IsKing && !(p.Square == currentSquare))
+                {
+                    Board defenseChecker = ScapeGoat(hypotheticalFen, p.Square, !p.IsWhite);
+                    foreach (Move defence in defenseChecker.GetLegalMoves())
+                    {
+                        if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
+                        {
+                            totalConsequence += Material(p.PieceType);
+                        }
+                    }
+                }
             }
         }
 
-        return viableMoves[new Random().Next(0, viableMoves.Count)];
+        board.UndoSkipTurn();
+
+        return totalConsequence;
     }
 
-    // ScapeGoat takes the current board and puts a bishop on a given square
-    // This is used to find all the pieces that control a given square
-    // En passant doesn't need to be accounted for here
-    public Board ScapeGoat(string fen, Square square, bool isWhite)
-    {
-        string[] rows = fen.Split('/');
-        StringBuilder newRow = new(Regex.Replace(rows[7 - square.Rank], @"\d+", match => new string('1', int.Parse(match.Value))));
-        newRow[square.File] = isWhite ? 'B' : 'b';
-        rows[7 - square.Rank] = Regex.Replace(newRow.ToString(), "1+", match => match.Value.Length.ToString());
 
-        return Board.CreateBoardFromFEN(string.Join("/", rows));
-    }
 
 
 }
