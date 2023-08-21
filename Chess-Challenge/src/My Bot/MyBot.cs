@@ -8,10 +8,10 @@ public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        int[] material = { 0, 1, 3, 3, 5, 9, 100 };
+        int[] material = { 0, 1, 3, 3, 5, 9, 10 };
         Move[] moves = board.GetLegalMoves();
         int[] moveEvals = new int[moves.Length];
-        int maxValue = -1000;
+        int maxValue = -10000;
 
         string currentFen = board.GetFenString();
 
@@ -21,8 +21,19 @@ public class MyBot : IChessBot
             Move move = moves[i];
 
             //we relinquish control of the square we move to and risk our material (I added material of capture piece and promotion)
-            int value = -1 * material[(int)move.MovePieceType] + material[(int)move.CapturePieceType] + material[(int)move.PromotionPieceType] - 10;
-
+            int value = -1 * material[(int)move.MovePieceType] + 2 * material[(int)move.CapturePieceType];
+            if (move.MovePieceType == PieceType.Pawn)
+            {
+                if (board.IsWhiteToMove)
+                {
+                    value += move.TargetSquare.Rank;
+                }
+                else value += 8 - move.TargetSquare.Rank;
+            }
+            else
+            {
+                value -= 10;
+            }
 
             //Calculate our control of the square
             Board attackChecker = ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove);
@@ -52,7 +63,8 @@ public class MyBot : IChessBot
                     value -= 10;
                 }
                 board.MakeMove(opponentMove);
-                if(board.IsInCheckmate()) {
+                if (board.IsInCheckmate())
+                {
                     value -= 1000;
                 }
                 board.UndoMove(opponentMove);
