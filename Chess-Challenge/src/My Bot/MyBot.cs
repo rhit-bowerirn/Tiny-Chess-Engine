@@ -4,11 +4,10 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ChessChallenge.API;
 
-
 public class MyBot : IChessBot
 {
 
-    Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
+    Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int) Type];
 
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
     // This is used to find all the pieces that control a given square
@@ -28,38 +27,19 @@ public class MyBot : IChessBot
         int[] moveEvals = new int[moves.Length];
         int maxValue = -10000;
         string currentFen = board.GetFenString();
-        bool isWhite = board.IsWhiteToMove;
-
 
         for (int i = 0; i < moves.Length; i++)
         {
             Move move = moves[i];
 
             //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
-            int value = -1 * Material(move.MovePieceType) + 2 * Material(move.CapturePieceType);
-            if (move.MovePieceType == PieceType.Pawn)
-            {
-                if (isWhite)
-                {
-                    value += move.TargetSquare.Rank;
-                }
-                else value += 8 - move.TargetSquare.Rank;
-            }
-            else
-            {
-                value -= 10;
-            }
-
-            //Calculate our control of the square
-            Board attackChecker = ScapeGoat(currentFen, move.TargetSquare, !isWhite);
-            foreach (Move m in attackChecker.GetLegalMoves())
-            {
-                if (m.TargetSquare.Equals(move.TargetSquare))
-                {
-                    value += 10;
-                }
-            }
-
+            int value = -1 * Material(move.MovePieceType)
+                        + 2 * Material(move.CapturePieceType)
+                        + ((move.MovePieceType == PieceType.Pawn) ?
+                            (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank)
+                            : -10)
+                        + ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
+                            .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) * 10;
 
             board.MakeMove(move);
 
@@ -68,70 +48,61 @@ public class MyBot : IChessBot
                 return move;
             }
 
-
-            //calculate opponent's control of the square
-            Move[] opponentMoves = board.GetLegalMoves();
-            foreach (Move opponentMove in opponentMoves)
-            {
-                if (opponentMove.TargetSquare.Index == move.TargetSquare.Index)
-                {
-                    //opponent piece puts pressure on the square
-                    value -= 10;
-                }
-                board.MakeMove(opponentMove);
-                if (board.IsInCheckmate())
-                {
-                    value -= 1000;
-                }
-                board.UndoMove(opponentMove);
-            }
-
-            value += CalculateFuturePlans(board, move);
-
+            moveEvals[i] = value += CalculateOpponentResponse(board, move.TargetSquare) + CalculateFuturePlans(board, move.TargetSquare);
+            maxValue = Math.Max(maxValue, value);
             board.UndoMove(move);
-            moveEvals[i] = value;
-            if (value > maxValue)
-            {
-                maxValue = value;
-            }
         }
 
         //pick a random top move
         return moves.Where((move, i) => moveEvals[i] == maxValue).OrderBy(_ => Guid.NewGuid()).First();
     }
 
+    // ***Assumes the move has already been made on the board***
+    // Calculates all the dangers the opponent can create on their turn
+    private int CalculateOpponentResponse(Board board, Square currentSquare)
+    {
+        int opponentThreats = 0;
+        //calculate opponent's control of the square
+        foreach (Move move in board.GetLegalMoves())
+        {
+            //opponent piece puts pressure on the square
+            if (move.TargetSquare == currentSquare)
+            {
+                opponentThreats += 10;
+            }
 
+            board.MakeMove(move);
+            opponentThreats += board.IsInCheckmate() ? 1000 : 0;
+            board.UndoMove(move);
+        }
 
+        return -opponentThreats;
+    }
 
     // ***Assumes the move has already been made on the board***
     // This is where we skip our opponents next turn to see how our move affects us
-    private int CalculateFuturePlans(Board board, Move move)
+    private int CalculateFuturePlans(Board board, Square currentSquare)
     {
-        Square currentSquare = move.TargetSquare;
         board.ForceSkipTurn();
 
+        //2 symbols less to do it like this
         int totalConsequence = board.GetLegalMoves()
             .Where(threat => threat.StartSquare == currentSquare)
             .Sum(threat => Material(threat.CapturePieceType));
 
         //find all the pieces we defend now
-        //TODO: clean up
         string hypotheticalFen = board.GetFenString();
         PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
+
         foreach (PieceList pieceList in pieceLists)
         {
-            for (int i = 0; i < pieceList.Count; i++)
+            foreach (Piece p in pieceList.Where(p => !p.IsKing && !(p.Square == currentSquare)))
             {
-                Piece p = pieceList.GetPiece(i);
-                if (!p.IsKing && !(p.Square == currentSquare))
+                foreach (Move defence in ScapeGoat(hypotheticalFen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
                 {
-                    Board defenseChecker = ScapeGoat(hypotheticalFen, p.Square, !p.IsWhite);
-                    foreach (Move defence in defenseChecker.GetLegalMoves())
+                    if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
                     {
-                        if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
-                        {
-                            totalConsequence += Material(p.PieceType);
-                        }
+                        totalConsequence += Material(p.PieceType);
                     }
                 }
             }
