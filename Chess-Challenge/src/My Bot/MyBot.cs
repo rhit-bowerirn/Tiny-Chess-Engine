@@ -7,7 +7,7 @@ using ChessChallenge.API;
 public class MyBot : IChessBot
 {
 
-    Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int) Type];
+    Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
 
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
     // This is used to find all the pieces that control a given square
@@ -28,10 +28,6 @@ public class MyBot : IChessBot
         int maxValue = -10000;
         string currentFen = board.GetFenString();
 
-        // for(int i = 0; i < moves.Length; i++) {
-        //     Console.WriteLine(moves[i]);
-        // }
-
         for (int i = 0; i < moves.Length; i++)
         {
             Move move = moves[i];
@@ -49,21 +45,20 @@ public class MyBot : IChessBot
 
             if (board.IsInCheckmate())
             {
+                board.UndoMove(move);
                 return move;
             }
-            value += CalculateOpponentResponse(board, move.TargetSquare);
+            value -= CalculateOpponentResponse(board, move.TargetSquare);
             value += CalculateFuturePlans(board, move.TargetSquare);
 
             board.UndoMove(move);
             moveEvals[i] = value;
             maxValue = Math.Max(maxValue, value);
         }
-        // for(int i = 0; i < moves.Length; i++) {
-        //     Console.WriteLine(moves[i] + " " + moveEvals[i]);
-        // }
 
         //pick a random top move
-        return moves.Where((move, i) => moveEvals[i] == maxValue).OrderBy(_ => Guid.NewGuid()).First();
+        Move[] topMoves = moves.Where((move, i) => moveEvals[i] == maxValue).ToArray();
+        return topMoves[new Random().Next(0, topMoves.Length)];
     }
 
     // ***Assumes the move has already been made on the board***
@@ -77,11 +72,14 @@ public class MyBot : IChessBot
             //opponent piece puts pressure on the square
             if (move.TargetSquare == currentSquare)
             {
-                opponentThreats -= 10;
+                opponentThreats += 10;
             }
 
             board.MakeMove(move);
-            opponentThreats += board.IsInCheckmate() ? -1000 : 0;
+            if (board.IsInCheckmate())
+            {
+                opponentThreats += 1000;
+            }
             board.UndoMove(move);
         }
 
