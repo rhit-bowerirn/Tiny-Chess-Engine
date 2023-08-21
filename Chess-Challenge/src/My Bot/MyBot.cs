@@ -22,14 +22,14 @@ public class MyBot : IChessBot
 
             //we relinquish control of the square we move to and risk our material (I added material of capture piece and promotion)
             int value = -1 * material[(int)move.MovePieceType] + material[(int)move.CapturePieceType] + material[(int)move.PromotionPieceType] - 10;
-            
+
 
             //Calculate our control of the square
-            Board attackChecker = scapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove);
-            Console.WriteLine(attackChecker.CreateDiagram(true, false, false));
-
-            foreach(Move m in attackChecker.GetLegalMoves()) {
-                if (m.TargetSquare.Equals(move.TargetSquare)) {
+            Board attackChecker = ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove);
+            foreach (Move m in attackChecker.GetLegalMoves())
+            {
+                if (m.TargetSquare.Equals(move.TargetSquare))
+                {
                     value += 10;
                 }
             }
@@ -40,7 +40,7 @@ public class MyBot : IChessBot
             {
                 return move;
             }
-            
+
 
             //calculate opponent's control of the square
             Move[] opponentMoves = board.GetLegalMoves();
@@ -53,8 +53,43 @@ public class MyBot : IChessBot
                 }
             }
 
-            //TODO calculate new threats
-            //TODO calculate new defence
+            board.ForceSkipTurn();
+
+            //find new threats we create
+            foreach (Move newMove in board.GetLegalMoves())
+            {
+                if (newMove.StartSquare == move.TargetSquare && newMove.IsCapture)
+                {
+                    value += material[(int)newMove.CapturePieceType];
+                }
+            }
+
+            //find all the pieces we defend now
+            string hypotheticalFen = board.GetFenString();
+            PieceList[] pieces = board.GetAllPieceLists();
+            foreach (PieceList pl in pieces)
+            {
+                if (pl.IsWhitePieceList == board.IsWhiteToMove)
+                {
+                    for (int index = 0; index < pl.Count; index++)
+                    {
+                        Piece p = pl.GetPiece(index);
+                        if (!p.IsKing && !(p.Square == move.TargetSquare))
+                        {
+                            Board defenseChecker = ScapeGoat(hypotheticalFen, p.Square, !p.IsWhite);
+                            foreach (Move defence in defenseChecker.GetLegalMoves())
+                            {
+                                if (defence.StartSquare.Index == move.TargetSquare.Index && defence.TargetSquare.Index == p.Square.Index)
+                                {
+                                    value += material[(int)p.PieceType];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            board.UndoSkipTurn();
 
             board.UndoMove(move);
             moveEvals[i] = value;
@@ -64,6 +99,7 @@ public class MyBot : IChessBot
             }
         }
 
+        //pick a random move
         List<Move> viableMoves = new();
         for (int i = 0; i < moves.Length; i++)
         {
@@ -76,16 +112,16 @@ public class MyBot : IChessBot
         return viableMoves[new Random().Next(0, viableMoves.Count)];
     }
 
-    //scapeGoat takes the current board and puts a bishop on a given square
-    //this is used to find all attackers of a given square
-    //TODO: account for en passant
-    public Board scapeGoat(string currentFen, Square square, bool isWhite)
+    // ScapeGoat takes the current board and puts a bishop on a given square
+    // This is used to find all the pieces that control a given square
+    // En passant doesn't need to be accounted for here
+    public Board ScapeGoat(string fen, Square square, bool isWhite)
     {
-        string[] rows = currentFen.Split('/');
+        string[] rows = fen.Split('/');
         StringBuilder newRow = new(Regex.Replace(rows[7 - square.Rank], @"\d+", match => new string('1', int.Parse(match.Value))));
         newRow[square.File] = isWhite ? 'B' : 'b';
         rows[7 - square.Rank] = Regex.Replace(newRow.ToString(), "1+", match => match.Value.Length.ToString());
-        
+
         return Board.CreateBoardFromFEN(string.Join("/", rows));
     }
 
