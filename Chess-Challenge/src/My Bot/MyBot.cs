@@ -28,6 +28,10 @@ public class MyBot : IChessBot
         int maxValue = -10000;
         string currentFen = board.GetFenString();
 
+        // for(int i = 0; i < moves.Length; i++) {
+        //     Console.WriteLine(moves[i]);
+        // }
+
         for (int i = 0; i < moves.Length; i++)
         {
             Move move = moves[i];
@@ -47,11 +51,16 @@ public class MyBot : IChessBot
             {
                 return move;
             }
+            value += CalculateOpponentResponse(board, move.TargetSquare);
+            value += CalculateFuturePlans(board, move.TargetSquare);
 
-            moveEvals[i] = value += CalculateOpponentResponse(board, move.TargetSquare) + CalculateFuturePlans(board, move.TargetSquare);
-            maxValue = Math.Max(maxValue, value);
             board.UndoMove(move);
+            moveEvals[i] = value;
+            maxValue = Math.Max(maxValue, value);
         }
+        // for(int i = 0; i < moves.Length; i++) {
+        //     Console.WriteLine(moves[i] + " " + moveEvals[i]);
+        // }
 
         //pick a random top move
         return moves.Where((move, i) => moveEvals[i] == maxValue).OrderBy(_ => Guid.NewGuid()).First();
@@ -68,15 +77,15 @@ public class MyBot : IChessBot
             //opponent piece puts pressure on the square
             if (move.TargetSquare == currentSquare)
             {
-                opponentThreats += 10;
+                opponentThreats -= 10;
             }
 
             board.MakeMove(move);
-            opponentThreats += board.IsInCheckmate() ? 1000 : 0;
+            opponentThreats += board.IsInCheckmate() ? -1000 : 0;
             board.UndoMove(move);
         }
 
-        return -opponentThreats;
+        return opponentThreats;
     }
 
     // ***Assumes the move has already been made on the board***
@@ -91,14 +100,14 @@ public class MyBot : IChessBot
             .Sum(threat => Material(threat.CapturePieceType));
 
         //find all the pieces we defend now
-        string hypotheticalFen = board.GetFenString();
+        string fen = board.GetFenString();
         PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
         foreach (PieceList pieceList in pieceLists)
         {
             foreach (Piece p in pieceList.Where(p => !p.IsKing && !(p.Square == currentSquare)))
             {
-                foreach (Move defence in ScapeGoat(hypotheticalFen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
+                foreach (Move defence in ScapeGoat(fen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
                 {
                     if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
                     {
@@ -112,8 +121,4 @@ public class MyBot : IChessBot
 
         return totalConsequence;
     }
-
-
-
-
 }
