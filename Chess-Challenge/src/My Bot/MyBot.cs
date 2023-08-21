@@ -51,6 +51,11 @@ public class MyBot : IChessBot
                     //opponent piece puts pressure on the square
                     value -= 10;
                 }
+                board.MakeMove(opponentMove);
+                if(board.IsInCheckmate()) {
+                    value -= 1000;
+                }
+                board.UndoMove(opponentMove);
             }
 
             board.ForceSkipTurn();
