@@ -25,7 +25,7 @@ public class MyBot : IChessBot
     {
         Move[] moves = board.GetLegalMoves();
         int[] moveEvals = new int[moves.Length];
-        int maxValue = -10000;
+        int maxValue = int.MinValue;
         string currentFen = board.GetFenString();
 
         for (int i = 0; i < moves.Length; i++)
@@ -80,6 +80,8 @@ public class MyBot : IChessBot
             if (board.IsInCheckmate())
             {
                 opponentThreats += 1000;
+                board.UndoMove(move);
+                break;
             }
             board.UndoMove(move);
         }
