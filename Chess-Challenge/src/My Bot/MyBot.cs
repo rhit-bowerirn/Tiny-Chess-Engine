@@ -33,23 +33,24 @@ public class MyBot : IChessBot
             Move move = moves[i];
 
             //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
-            int value = -1 * Material(move.MovePieceType)
-                        + 2 * Material(move.CapturePieceType)
+            int value = -1 * Material(move.MovePieceType) //subtract material risk - material cost
+                        + 2 * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
                         + ((move.MovePieceType == PieceType.Pawn) ?
-                            (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank)
-                            : -10)
+                            (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
+                            : -10) //subtract relinquished control
                         + ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
-                            .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) * 10;
+                            .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) * 10;  //count the number of defenders - our control
 
             board.MakeMove(move);
 
-            if (board.IsInCheckmate())
+            if (board.IsInCheckmate()) //found winning move
             {
                 board.UndoMove(move);
                 return move;
             }
-            value -= CalculateOpponentResponse(board, move.TargetSquare);
-            value += CalculateFuturePlans(board, move.TargetSquare);
+
+            value -= CalculateOpponentResponse(board, move.TargetSquare); //find the number of attackers - opponent control
+            value += CalculateFuturePlans(board, move.TargetSquare); //new picese we defend and attack
 
             board.UndoMove(move);
             moveEvals[i] = value;
@@ -93,11 +94,12 @@ public class MyBot : IChessBot
         board.ForceSkipTurn();
 
         //2 symbols less to do it like this
+        //new threats we create
         int totalConsequence = board.GetLegalMoves()
             .Where(threat => threat.StartSquare == currentSquare)
             .Sum(threat => Material(threat.CapturePieceType));
 
-        //find all the pieces we defend now
+        //find new pieces we defend
         string fen = board.GetFenString();
         PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
