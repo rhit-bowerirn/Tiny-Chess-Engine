@@ -34,12 +34,37 @@ public class MyBot : IChessBot
 
             //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
             int value = -1 * Material(move.MovePieceType) //subtract material risk - material cost
-                        + 2 * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
-                        + ((move.MovePieceType == PieceType.Pawn) ?
+                        + 3 * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
+                        + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
                             (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
                             : -10) //subtract relinquished control
                         + ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
                             .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) * 10;  //count the number of defenders - our control
+
+
+
+            //Subtract all the material we would stop defending
+            PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
+            foreach (PieceList pieceList in pieceLists)
+            {
+                foreach (Piece p in pieceList.Where(p => !p.IsKing && !(p.Square == move.StartSquare)))
+                {
+                    foreach (Move defence in ScapeGoat(currentFen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
+                    {
+                        if (defence.StartSquare.Index == move.StartSquare.Index && defence.TargetSquare.Index == p.Square.Index)
+                        {
+                            value -= Material(p.PieceType);
+                        }
+                    }
+                }
+            }
+            
+            //find how bad it would be to stay in the same square
+            if(board.TrySkipTurn()) {
+                value += board.GetLegalMoves().Where(opponentMove => opponentMove.TargetSquare == move.StartSquare).Count() * 10;
+                board.UndoSkipTurn();
+            }
+
 
             board.MakeMove(move);
 
@@ -50,9 +75,10 @@ public class MyBot : IChessBot
             }
 
             value -= CalculateOpponentResponse(board, move.TargetSquare); //find the number of attackers - opponent control
-            value += CalculateFuturePlans(board, move.TargetSquare); //new picese we defend and attack
+            value += CalculateFuturePlans(board, move.TargetSquare); //new piecse we defend and attack
 
             board.UndoMove(move);
+
             moveEvals[i] = value;
             maxValue = Math.Max(maxValue, value);
         }
@@ -94,12 +120,18 @@ public class MyBot : IChessBot
     private int CalculateFuturePlans(Board board, Square currentSquare)
     {
         board.ForceSkipTurn();
+        int totalConsequence = 0;
 
         //2 symbols less to do it like this
         //new threats we create
-        int totalConsequence = board.GetLegalMoves()
-            .Where(threat => threat.StartSquare == currentSquare)
-            .Sum(threat => Material(threat.CapturePieceType));
+        foreach (Move move in board.GetLegalMoves().Where(threat => threat.StartSquare == currentSquare))
+        {
+            if (move.IsCapture)
+            {
+                totalConsequence += 2 * Material(move.CapturePieceType);
+            }
+            else totalConsequence += 1;
+        }
 
         //find new pieces we defend
         string fen = board.GetFenString();
