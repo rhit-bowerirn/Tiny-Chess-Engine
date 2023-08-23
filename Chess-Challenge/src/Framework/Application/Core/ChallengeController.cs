@@ -17,7 +17,7 @@ namespace ChessChallenge.Application
     {
         public enum PlayerType
         {
-            Human,
+            // Human,
             MyBot,
             EvilBot
         }
@@ -34,7 +34,7 @@ namespace ChessChallenge.Application
         bool isWaitingToPlayMove;
         Move moveToPlay;
         float playMoveTime;
-        public bool HumanWasWhiteLastGame { get; private set; }
+        // public bool HumanWasWhiteLastGame { get; private set; }
 
         // Bot match state
         readonly string[] botMatchStartFens;
@@ -93,15 +93,16 @@ namespace ChessChallenge.Application
             }
             // Board Setup
             board = new Board();
-            bool isGameWithHuman = whiteType is PlayerType.Human || blackType is PlayerType.Human;
-            int fenIndex = isGameWithHuman ? 0 : botMatchGameIndex / 2;
+            // bool isGameWithHuman = whiteType is PlayerType.Human || blackType is PlayerType.Human;
+            // int fenIndex = isGameWithHuman ? 0 : botMatchGameIndex / 2;
+            int fenIndex = botMatchGameIndex / 2;
             board.LoadPosition(botMatchStartFens[fenIndex]);
 
             // Player Setup
             PlayerWhite = CreatePlayer(whiteType);
             PlayerBlack = CreatePlayer(blackType);
-            PlayerWhite.SubscribeToMoveChosenEventIfHuman(OnMoveChosen);
-            PlayerBlack.SubscribeToMoveChosenEventIfHuman(OnMoveChosen);
+            // PlayerWhite.SubscribeToMoveChosenEventIfHuman(OnMoveChosen);
+            // PlayerBlack.SubscribeToMoveChosenEventIfHuman(OnMoveChosen);
 
             // UI Setup
             boardUI.UpdatePosition(board);
@@ -164,14 +165,27 @@ namespace ChessChallenge.Application
         void NotifyTurnToMove()
         {
             //playerToMove.NotifyTurnToMove(board);
-            if (PlayerToMove.IsHuman)
-            {
-                PlayerToMove.Human.SetPosition(FenUtility.CurrentFen(board));
-                PlayerToMove.Human.NotifyTurnToMove();
-            }
-            else
-            {
-                if (RunBotsOnSeparateThread)
+            // if (PlayerToMove.IsHuman)
+            // {
+            //     PlayerToMove.Human.SetPosition(FenUtility.CurrentFen(board));
+            //     PlayerToMove.Human.NotifyTurnToMove();
+            // }
+            // else
+            // {
+            //     if (RunBotsOnSeparateThread)
+            //     {
+            //         botTaskWaitHandle.Set();
+            //     }
+            //     else
+            //     {
+            //         double startThinkTime = Raylib.GetTime();
+            //         var move = GetBotMove();
+            //         double thinkDuration = Raylib.GetTime() - startThinkTime;
+            //         PlayerToMove.UpdateClock(thinkDuration);
+            //         OnMoveChosen(move);
+            //     }
+            // }
+            if (RunBotsOnSeparateThread)
                 {
                     botTaskWaitHandle.Set();
                 }
@@ -183,25 +197,25 @@ namespace ChessChallenge.Application
                     PlayerToMove.UpdateClock(thinkDuration);
                     OnMoveChosen(move);
                 }
-            }
         }
 
         void SetBoardPerspective()
         {
             // Board perspective
-            if (PlayerWhite.IsHuman || PlayerBlack.IsHuman)
-            {
-                boardUI.SetPerspective(PlayerWhite.IsHuman);
-                HumanWasWhiteLastGame = PlayerWhite.IsHuman;
-            }
-            else if (PlayerWhite.Bot is MyBot && PlayerBlack.Bot is MyBot)
-            {
-                boardUI.SetPerspective(true);
-            }
-            else
-            {
-                boardUI.SetPerspective(PlayerWhite.Bot is MyBot);
-            }
+            // if (PlayerWhite.IsHuman || PlayerBlack.IsHuman)
+            // {
+            //     boardUI.SetPerspective(PlayerWhite.IsHuman);
+            //     HumanWasWhiteLastGame = PlayerWhite.IsHuman;
+            // }
+            // else if (PlayerWhite.Bot is MyBot && PlayerBlack.Bot is MyBot)
+            // {
+            //     boardUI.SetPerspective(true);
+            // }
+            // else
+            // {
+            //     boardUI.SetPerspective(PlayerWhite.Bot is MyBot);
+            // }
+            boardUI.SetPerspective(PlayerWhite.Bot is MyBot);
         }
 
         ChessPlayer CreatePlayer(PlayerType type)
@@ -210,7 +224,7 @@ namespace ChessChallenge.Application
             {
                 PlayerType.MyBot => new ChessPlayer(new MyBot(), type, GameDurationMilliseconds),
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
-                _ => new ChessPlayer(new HumanPlayer(boardUI), type)
+                _ => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds)
             };
         }
 
@@ -403,8 +417,8 @@ namespace ChessChallenge.Application
         public void DrawOverlay()
         {
             BotBrainCapacityUI.Draw(tokenCount, debugTokenCount, MaxTokenCount);
-            MenuUI.DrawButtons(this);
-            MatchStatsUI.DrawMatchStats(this);
+            // MenuUI.DrawButtons(this);
+            // MatchStatsUI.DrawMatchStats(this);
         }
 
         static string GetPlayerName(ChessPlayer player) => GetPlayerName(player.PlayerType);
