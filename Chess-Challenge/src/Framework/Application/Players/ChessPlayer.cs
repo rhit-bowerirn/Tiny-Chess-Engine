@@ -19,6 +19,7 @@ namespace ChessChallenge.Application
         {
             this.PlayerType = type;
             Bot = instance as IChessBot;
+            Bot.readWeightsFromFile();
             Human = instance as HumanPlayer;
             this.baseTimeMs = baseTimeMs;
 

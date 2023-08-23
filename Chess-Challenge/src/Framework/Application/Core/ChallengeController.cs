@@ -58,7 +58,7 @@ namespace ChessChallenge.Application
 
         public ChallengeController()
         {
-            Log($"Launching Chess-Challenge version {Settings.Version}");
+            // Log($"Launching Chess-Challenge version {Settings.Version}");
             (tokenCount, debugTokenCount) = GetTokenCount();
             Warmer.Warm();
 
@@ -295,6 +295,7 @@ namespace ChessChallenge.Application
                 {
                     Log(val.ToString(), false, ConsoleColor.Blue);
                 }
+                Environment.Exit(0);
 
                 // string pgn = PGNCreator.CreatePGN(board, result, GetPlayerName(PlayerWhite), GetPlayerName(PlayerBlack));
                 // pgns.AppendLine(pgn);

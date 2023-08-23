@@ -73,8 +73,6 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
-        readWeightsFromFile();
-
         Move[] moves = board.GetLegalMoves();
         double[] moveEvals = new double[moves.Length];
         double maxValue = double.MinValue;
@@ -231,7 +229,7 @@ public class MyBot : IChessBot
         return sum;
     }
 
-    private void readWeightsFromFile() {
+    public void readWeightsFromFile() {
         using (StreamReader sr = File.OpenText("src/My bot/weights.txt"))
         {
             NEW_DEFENDERS = Convert.ToDouble(sr.ReadLine());
