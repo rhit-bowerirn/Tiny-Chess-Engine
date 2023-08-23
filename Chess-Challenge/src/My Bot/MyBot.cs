@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.IO;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot
@@ -10,53 +11,53 @@ public class MyBot : IChessBot
     Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
 
     // how much to add for each of our pieces defending the new square.
-    const double NEW_DEFENDERS = 10.0; // default is 10
+    double NEW_DEFENDERS = 10.0; // default is 10
 
     // how much to subtract for each of their pieces attacking the new square.
-    const double NEW_ATTACKERS = 10.0; // default is 10
+    double NEW_ATTACKERS = 10.0; // default is 10
 
     // multiplier weight for the material weight of pieces we start defending
-    const double NEW_DEFENSE = 1.0; // default is 1
+    double NEW_DEFENSE = 1.0; // default is 1
 
     // multiplier weight for the material weight of pieces we start attacking
-    const double NEW_ATTACKS = 2.0; // default is 1
+    double NEW_ATTACKS = 2.0; // default is 1
 
     // multiplier weight for the number of squares we can now move to
-    const double NEW_MOVES = 1.0; // default is 1
+    double NEW_MOVES = 1.0; // default is 1
 
     // how much we subtract for giving up control of a square
-    const double RELINQUISHED_CONTROL = 10.0; // default is 10
+    double RELINQUISHED_CONTROL = 10.0; // default is 10
 
     // multiplier weight for the material weight of piece we are risking
-    const double RISK_WEIGHT = 1.0; // default is 1
+    double RISK_WEIGHT = 1.0; // default is 1
 
     // multiplier weight for the material weight of piece we are capturing
-    const double CAPTURE_WEIGHT = 3.0; // default is 1
+    double CAPTURE_WEIGHT = 3.0; // default is 1
 
     // multiplier weight to encourage promotion
-    const double PROMOTION_WEIGHT = 1.0; // default is 1
+    double PROMOTION_WEIGHT = 1.0; // default is 1
 
     // multiplier weight for the material weight of pieces we stop defending
-    const double OLD_DEFENSE = 1.0; // default is 1
+    double OLD_DEFENSE = 1.0; // default is 1
 
     // multiplier weight for the material weight of pieces we stop attacking
     //NOT IMPLEMENTED YET
-    const double OLD_ATTACKS = 1.0; // default is 1
+    double OLD_ATTACKS = 1.0; // default is 1
 
     // how much we add for each of their pieces attacking the old square
-    const double OLD_ATTACKERS = 10.0; // default is 10
+    double OLD_ATTACKERS = 10.0; // default is 10
 
     // how much we subtract for each of the squares we used to be able to move to
-    const double OLD_MOVES = 1.0; // default is 1
+    double OLD_MOVES = 1.0; // default is 1
 
     //multiplier for captures our opponent can currently make
-    const double OLD_THREATS = 1.0;
+    double OLD_THREATS = 1.0;
 
     //multiplier for the captures our opponent will be able to make
-    const double NEW_THREATS = 1.0;
+    double NEW_THREATS = 1.0;
 
     //weight to encourage castling
-    const double CASTLE_BONUS = 5.0; //defaiult is 1;
+    double CASTLE_BONUS = 5.0; //defaiult is 1;
 
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
     // This is used to find all the pieces that control a given square
@@ -72,6 +73,8 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
+        readWeightsFromFile();
+
         Move[] moves = board.GetLegalMoves();
         double[] moveEvals = new double[moves.Length];
         double maxValue = double.MinValue;
@@ -226,5 +229,29 @@ public class MyBot : IChessBot
         }
 
         return sum;
+    }
+
+    private void readWeightsFromFile() {
+        using (StreamReader sr = File.OpenText("src/My bot/weights.txt"))
+        {
+            NEW_DEFENDERS = Convert.ToDouble(sr.ReadLine());
+            NEW_ATTACKERS = Convert.ToDouble(sr.ReadLine());
+            NEW_DEFENSE = Convert.ToDouble(sr.ReadLine());
+            NEW_ATTACKS = Convert.ToDouble(sr.ReadLine());
+            NEW_MOVES = Convert.ToDouble(sr.ReadLine());
+            NEW_THREATS = Convert.ToDouble(sr.ReadLine());
+            
+            OLD_DEFENSE = Convert.ToDouble(sr.ReadLine());
+            OLD_ATTACKS = Convert.ToDouble(sr.ReadLine());
+            OLD_ATTACKERS = Convert.ToDouble(sr.ReadLine());
+            OLD_MOVES = Convert.ToDouble(sr.ReadLine());
+            OLD_THREATS = Convert.ToDouble(sr.ReadLine());
+
+            RELINQUISHED_CONTROL = Convert.ToDouble(sr.ReadLine());
+            RISK_WEIGHT = Convert.ToDouble(sr.ReadLine());
+            CAPTURE_WEIGHT = Convert.ToDouble(sr.ReadLine());
+            PROMOTION_WEIGHT = Convert.ToDouble(sr.ReadLine());
+            CASTLE_BONUS = Convert.ToDouble(sr.ReadLine());
+        }
     }
 }

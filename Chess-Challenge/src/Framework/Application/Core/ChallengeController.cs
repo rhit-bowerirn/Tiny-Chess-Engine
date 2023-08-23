@@ -1,5 +1,5 @@
 ﻿using ChessChallenge.Chess;
-using ChessChallenge.Example;
+// using ChessChallenge.Example;
 using Raylib_cs;
 using System;
 using System.IO;
@@ -73,7 +73,7 @@ namespace ChessChallenge.Application
             botMatchStartFens = FileHelper.ReadResourceFile("Fens.txt").Split('\n').Where(fen => fen.Length > 0).ToArray();
             botTaskWaitHandle = new AutoResetEvent(false);
 
-            StartNewGame(PlayerType.Human, PlayerType.MyBot);
+            StartNewGame(PlayerType.MyBot, PlayerType.EvilBot);
         }
 
         public void StartNewGame(PlayerType whiteType, PlayerType blackType)
@@ -279,37 +279,49 @@ namespace ChessChallenge.Application
                 isWaitingToPlayMove = false;
                 gameID = -1;
 
+                double val = 0;
+                // Draw
+                if (Arbiter.IsDrawResult(result))
+                {
+                    val = 0.5;
+                }
+                // Win
+                else if (Arbiter.IsWhiteWinsResult(result))
+                {
+                    val = 1;
+                }
+
                 if (log)
                 {
-                    Log("Game Over: " + result, false, ConsoleColor.Blue);
+                    Log(val.ToString(), false, ConsoleColor.Blue);
                 }
 
-                string pgn = PGNCreator.CreatePGN(board, result, GetPlayerName(PlayerWhite), GetPlayerName(PlayerBlack));
-                pgns.AppendLine(pgn);
+                // string pgn = PGNCreator.CreatePGN(board, result, GetPlayerName(PlayerWhite), GetPlayerName(PlayerBlack));
+                // pgns.AppendLine(pgn);
 
-                // If 2 bots playing each other, start next game automatically.
-                if (PlayerWhite.IsBot && PlayerBlack.IsBot)
-                {
-                    UpdateBotMatchStats(result);
-                    botMatchGameIndex++;
-                    int numGamesToPlay = botMatchStartFens.Length * 2;
+                // // If 2 bots playing each other, start next game automatically.
+                // if (PlayerWhite.IsBot && PlayerBlack.IsBot)
+                // {
+                //     UpdateBotMatchStats(result);
+                //     botMatchGameIndex++;
+                //     int numGamesToPlay = botMatchStartFens.Length * 2;
 
-                    if (botMatchGameIndex < numGamesToPlay && autoStartNextBotMatch)
-                    {
-                        botAPlaysWhite = !botAPlaysWhite;
-                        const int startNextGameDelayMs = 600;
-                        System.Timers.Timer autoNextTimer = new(startNextGameDelayMs);
-                        int originalGameID = gameID;
-                        autoNextTimer.Elapsed += (s, e) => AutoStartNextBotMatchGame(originalGameID, autoNextTimer);
-                        autoNextTimer.AutoReset = false;
-                        autoNextTimer.Start();
+                //     if (botMatchGameIndex < numGamesToPlay && autoStartNextBotMatch)
+                //     {
+                //         botAPlaysWhite = !botAPlaysWhite;
+                //         const int startNextGameDelayMs = 600;
+                //         System.Timers.Timer autoNextTimer = new(startNextGameDelayMs);
+                //         int originalGameID = gameID;
+                //         autoNextTimer.Elapsed += (s, e) => AutoStartNextBotMatchGame(originalGameID, autoNextTimer);
+                //         autoNextTimer.AutoReset = false;
+                //         autoNextTimer.Start();
 
-                    }
-                    else if (autoStartNextBotMatch)
-                    {
-                        Log("Match finished", false, ConsoleColor.Blue);
-                    }
-                }
+                //     }
+                //     else if (autoStartNextBotMatch)
+                //     {
+                //         Log("Match finished", false, ConsoleColor.Blue);
+                //     }
+                // }
             }
         }
 
