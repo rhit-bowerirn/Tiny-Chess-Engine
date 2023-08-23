@@ -42,7 +42,7 @@ namespace ChessChallenge.Application
 
                 Raylib.EndMode2D();
 
-                controller.DrawOverlay();
+                // controller.DrawOverlay();
 
                 Raylib.EndDrawing();
             }

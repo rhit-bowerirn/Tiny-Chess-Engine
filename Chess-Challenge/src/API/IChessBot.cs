@@ -5,6 +5,5 @@ namespace ChessChallenge.API
     {
         Move Think(Board board, Timer timer);
 
-        void readWeightsFromFile();
     }
 }

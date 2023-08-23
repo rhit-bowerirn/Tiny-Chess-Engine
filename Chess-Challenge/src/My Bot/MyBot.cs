@@ -73,6 +73,8 @@ public class MyBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
+        readWeightsFromFile();
+        
         Move[] moves = board.GetLegalMoves();
         double[] moveEvals = new double[moves.Length];
         double maxValue = double.MinValue;

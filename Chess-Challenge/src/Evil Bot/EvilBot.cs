@@ -73,6 +73,8 @@ public class EvilBot : IChessBot
 
     public Move Think(Board board, Timer timer)
     {
+        readWeightsFromFile();
+        
         Move[] moves = board.GetLegalMoves();
         double[] moveEvals = new double[moves.Length];
         double maxValue = double.MinValue;
@@ -230,7 +232,7 @@ public class EvilBot : IChessBot
     }
 
     public void readWeightsFromFile() {
-        using (StreamReader sr = File.OpenText("src/My bot/weights.txt"))
+        using (StreamReader sr = File.OpenText("src/Evil Bot/weights.txt"))
         {
             NEW_DEFENDERS = Convert.ToDouble(sr.ReadLine());
             NEW_ATTACKERS = Convert.ToDouble(sr.ReadLine());

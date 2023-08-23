@@ -17,10 +17,11 @@ namespace ChessChallenge.Application
     {
         public enum PlayerType
         {
-            // Human,
             MyBot,
             EvilBot
         }
+
+        int gamesToPlay = 2;
 
         // Game state
         readonly Random rng;
@@ -34,11 +35,9 @@ namespace ChessChallenge.Application
         bool isWaitingToPlayMove;
         Move moveToPlay;
         float playMoveTime;
-        // public bool HumanWasWhiteLastGame { get; private set; }
 
         // Bot match state
         readonly string[] botMatchStartFens;
-        int botMatchGameIndex;
         public BotMatchStats BotStatsA { get; private set; }
         public BotMatchStats BotStatsB {get;private set;}
         bool botAPlaysWhite;
@@ -52,14 +51,13 @@ namespace ChessChallenge.Application
         // Other
         readonly BoardUI boardUI;
         readonly MoveGenerator moveGenerator;
-        readonly int tokenCount;
-        readonly int debugTokenCount;
         readonly StringBuilder pgns;
+
+        int gamesCompleted = 0;
+        double score = 0;
 
         public ChallengeController()
         {
-            // Log($"Launching Chess-Challenge version {Settings.Version}");
-            (tokenCount, debugTokenCount) = GetTokenCount();
             Warmer.Warm();
 
             rng = new Random();
@@ -93,16 +91,12 @@ namespace ChessChallenge.Application
             }
             // Board Setup
             board = new Board();
-            // bool isGameWithHuman = whiteType is PlayerType.Human || blackType is PlayerType.Human;
-            // int fenIndex = isGameWithHuman ? 0 : botMatchGameIndex / 2;
-            int fenIndex = botMatchGameIndex / 2;
+            int fenIndex = gamesCompleted / 2;
             board.LoadPosition(botMatchStartFens[fenIndex]);
 
             // Player Setup
             PlayerWhite = CreatePlayer(whiteType);
             PlayerBlack = CreatePlayer(blackType);
-            // PlayerWhite.SubscribeToMoveChosenEventIfHuman(OnMoveChosen);
-            // PlayerBlack.SubscribeToMoveChosenEventIfHuman(OnMoveChosen);
 
             // UI Setup
             boardUI.UpdatePosition(board);
@@ -139,7 +133,6 @@ namespace ChessChallenge.Application
                     break;
                 }
             }
-            //Console.WriteLine("Exitting thread: " + threadID);
         }
 
         Move GetBotMove()
@@ -164,27 +157,6 @@ namespace ChessChallenge.Application
 
         void NotifyTurnToMove()
         {
-            //playerToMove.NotifyTurnToMove(board);
-            // if (PlayerToMove.IsHuman)
-            // {
-            //     PlayerToMove.Human.SetPosition(FenUtility.CurrentFen(board));
-            //     PlayerToMove.Human.NotifyTurnToMove();
-            // }
-            // else
-            // {
-            //     if (RunBotsOnSeparateThread)
-            //     {
-            //         botTaskWaitHandle.Set();
-            //     }
-            //     else
-            //     {
-            //         double startThinkTime = Raylib.GetTime();
-            //         var move = GetBotMove();
-            //         double thinkDuration = Raylib.GetTime() - startThinkTime;
-            //         PlayerToMove.UpdateClock(thinkDuration);
-            //         OnMoveChosen(move);
-            //     }
-            // }
             if (RunBotsOnSeparateThread)
                 {
                     botTaskWaitHandle.Set();
@@ -201,20 +173,6 @@ namespace ChessChallenge.Application
 
         void SetBoardPerspective()
         {
-            // Board perspective
-            // if (PlayerWhite.IsHuman || PlayerBlack.IsHuman)
-            // {
-            //     boardUI.SetPerspective(PlayerWhite.IsHuman);
-            //     HumanWasWhiteLastGame = PlayerWhite.IsHuman;
-            // }
-            // else if (PlayerWhite.Bot is MyBot && PlayerBlack.Bot is MyBot)
-            // {
-            //     boardUI.SetPerspective(true);
-            // }
-            // else
-            // {
-            //     boardUI.SetPerspective(PlayerWhite.Bot is MyBot);
-            // }
             boardUI.SetPerspective(PlayerWhite.Bot is MyBot);
         }
 
@@ -223,18 +181,8 @@ namespace ChessChallenge.Application
             return type switch
             {
                 PlayerType.MyBot => new ChessPlayer(new MyBot(), type, GameDurationMilliseconds),
-                PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
                 _ => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds)
             };
-        }
-
-        static (int totalTokenCount, int debugTokenCount) GetTokenCount()
-        {
-            string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", "MyBot.cs");
-
-            using StreamReader reader = new(path);
-            string txt = reader.ReadToEnd();
-            return TokenCounter.CountTokens(txt);
         }
 
         void OnMoveChosen(Move chosenMove)
@@ -242,16 +190,9 @@ namespace ChessChallenge.Application
             if (IsLegal(chosenMove))
             {
                 PlayerToMove.AddIncrement(IncrementMilliseconds);
-                if (PlayerToMove.IsBot)
-                {
-                    moveToPlay = chosenMove;
-                    isWaitingToPlayMove = true;
-                    playMoveTime = lastMoveMadeTime + MinMoveDelay;
-                }
-                else
-                {
-                    PlayMove(chosenMove);
-                }
+                moveToPlay = chosenMove;
+                isWaitingToPlayMove = true;
+                playMoveTime = lastMoveMadeTime + MinMoveDelay;
             }
             else
             {
@@ -267,11 +208,10 @@ namespace ChessChallenge.Application
         {
             if (isPlaying)
             {
-                bool animate = PlayerToMove.IsBot;
                 lastMoveMadeTime = (float)Raylib.GetTime();
 
                 board.MakeMove(move, false);
-                boardUI.UpdatePosition(board, move, animate);
+                boardUI.UpdatePosition(board, move, true);
 
                 GameResult result = Arbiter.GetGameState(board);
                 if (result == GameResult.InProgress)
@@ -289,54 +229,35 @@ namespace ChessChallenge.Application
         {
             if (isPlaying)
             {
+                gamesCompleted += 1;
                 isPlaying = false;
                 isWaitingToPlayMove = false;
                 gameID = -1;
 
-                double val = 0;
                 // Draw
                 if (Arbiter.IsDrawResult(result))
                 {
-                    val = 0.5;
+                    score += 0.5;
                 }
                 // Win
-                else if (Arbiter.IsWhiteWinsResult(result))
+                else if (Arbiter.IsWhiteWinsResult(result) && PlayerWhite.Bot is MyBot)
                 {
-                    val = 1;
+                    score += 1;
                 }
 
-                if (log)
+                if (gamesCompleted >= gamesToPlay)
                 {
-                    Log(val.ToString(), false, ConsoleColor.Blue);
+                    Log(score.ToString(), false, ConsoleColor.Blue);
+                    Environment.Exit(0);
                 }
-                Environment.Exit(0);
 
-                // string pgn = PGNCreator.CreatePGN(board, result, GetPlayerName(PlayerWhite), GetPlayerName(PlayerBlack));
-                // pgns.AppendLine(pgn);
-
-                // // If 2 bots playing each other, start next game automatically.
-                // if (PlayerWhite.IsBot && PlayerBlack.IsBot)
-                // {
-                //     UpdateBotMatchStats(result);
-                //     botMatchGameIndex++;
-                //     int numGamesToPlay = botMatchStartFens.Length * 2;
-
-                //     if (botMatchGameIndex < numGamesToPlay && autoStartNextBotMatch)
-                //     {
-                //         botAPlaysWhite = !botAPlaysWhite;
-                //         const int startNextGameDelayMs = 600;
-                //         System.Timers.Timer autoNextTimer = new(startNextGameDelayMs);
-                //         int originalGameID = gameID;
-                //         autoNextTimer.Elapsed += (s, e) => AutoStartNextBotMatchGame(originalGameID, autoNextTimer);
-                //         autoNextTimer.AutoReset = false;
-                //         autoNextTimer.Start();
-
-                //     }
-                //     else if (autoStartNextBotMatch)
-                //     {
-                //         Log("Match finished", false, ConsoleColor.Blue);
-                //     }
-                // }
+                botAPlaysWhite = !botAPlaysWhite;
+                const int startNextGameDelayMs = 600;
+                System.Timers.Timer autoNextTimer = new(startNextGameDelayMs);
+                int originalGameID = gameID;
+                autoNextTimer.Elapsed += (s, e) => AutoStartNextBotMatchGame(originalGameID, autoNextTimer);
+                autoNextTimer.AutoReset = false;
+                autoNextTimer.Start();
             }
         }
 
@@ -381,9 +302,6 @@ namespace ChessChallenge.Application
         {
             if (isPlaying)
             {
-                PlayerWhite.Update();
-                PlayerBlack.Update();
-
                 PlayerToMove.UpdateClock(Raylib.GetFrameTime());
                 if (PlayerToMove.TimeRemainingMs <= 0)
                 {
@@ -414,20 +332,13 @@ namespace ChessChallenge.Application
             boardUI.DrawPlayerNames(nameW, nameB, PlayerWhite.TimeRemainingMs, PlayerBlack.TimeRemainingMs, isPlaying);
         }
 
-        public void DrawOverlay()
-        {
-            BotBrainCapacityUI.Draw(tokenCount, debugTokenCount, MaxTokenCount);
-            // MenuUI.DrawButtons(this);
-            // MatchStatsUI.DrawMatchStats(this);
-        }
-
         static string GetPlayerName(ChessPlayer player) => GetPlayerName(player.PlayerType);
         static string GetPlayerName(PlayerType type) => type.ToString();
 
         public void StartNewBotMatch(PlayerType botTypeA, PlayerType botTypeB)
         {
             EndGame(GameResult.DrawByArbiter, log: false, autoStartNextBotMatch: false);
-            botMatchGameIndex = 0;
+            gamesCompleted = 0;
             string nameA = GetPlayerName(botTypeA);
             string nameB = GetPlayerName(botTypeB);
             if (nameA == nameB)
@@ -447,7 +358,6 @@ namespace ChessChallenge.Application
         ChessPlayer PlayerNotOnMove => board.IsWhiteToMove ? PlayerBlack : PlayerWhite;
 
         public int TotalGameCount => botMatchStartFens.Length * 2;
-        public int CurrGameNumber => Math.Min(TotalGameCount, botMatchGameIndex + 1);
         public string AllPGNs => pgns.ToString();
 
 
