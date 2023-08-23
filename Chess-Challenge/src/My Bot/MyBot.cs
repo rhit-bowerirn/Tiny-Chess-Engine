@@ -46,14 +46,17 @@ public class MyBot : IChessBot
     // how much we add for each of their pieces attacking the old square
     const double OLD_ATTACKERS = 10.0; // default is 10
 
-    // how much we subtract for each of our pieces defending the old square
-    //NOT IMPLEMENTED YET
-    const double OLD_DEFENDERS = 10.0; // default is 10
-
     // how much we subtract for each of the squares we used to be able to move to
-    //NOT IMPLEMENTED YET
-    const double OLD_MOVES = 0.0; // default is 1
+    const double OLD_MOVES = 1.0; // default is 1
 
+    //multiplier for captures our opponent can currently make
+    const double OLD_THREATS = 1.0;
+
+    //multiplier for the captures our opponent will be able to make
+    const double NEW_THREATS = 1.0;
+
+    //weight to encourage castling
+    const double CASTLE_BONUS = 5.0; //defaiult is 1;
 
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
     // This is used to find all the pieces that control a given square
@@ -84,30 +87,37 @@ public class MyBot : IChessBot
                         + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
                             PROMOTION_WEIGHT * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
                             : -RELINQUISHED_CONTROL) //subtract relinquished control
-                        + NEW_DEFENDERS *  ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
-                            .Count(m => m.TargetSquare.Index == move.TargetSquare.Index);  //count the number of defenders - our control
+                        + NEW_DEFENDERS * ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
+                            .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) //count the number of defenders - our control
+                        - findDefendedPieces(board, move.StartSquare, OLD_DEFENSE);                            
 
+            if(move.IsCastles) {
+                value += CASTLE_BONUS;
+            }
 
+            if(move.IsPromotion) {
+                value += Material(move.PromotionPieceType);
+            }
 
-            //Subtract all the material we would stop defending
-            PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
-            foreach (PieceList pieceList in pieceLists)
-            {
-                foreach (Piece p in pieceList.Where(p => !p.IsKing && !(p.Square == move.StartSquare)))
-                {
-                    foreach (Move defence in ScapeGoat(currentFen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
-                    {
-                        if (defence.StartSquare.Index == move.StartSquare.Index && defence.TargetSquare.Index == p.Square.Index)
-                        {
-                            value -= OLD_DEFENSE * Material(p.PieceType);
-                        }
-                    }
+            foreach (Move m in moves) {
+                if(m.StartSquare == move.StartSquare) {
+                    value -= OLD_MOVES;
+                    value -= OLD_ATTACKS * Material(m.CapturePieceType);
                 }
             }
-            
-            //find how bad it would be to stay in the same square
-            if(board.TrySkipTurn()) {
-                value +=  OLD_ATTACKERS * board.GetLegalMoves().Where(opponentMove => opponentMove.TargetSquare == move.StartSquare).Count();
+
+            if (board.TrySkipTurn())
+            {
+                foreach (Move threat in board.GetLegalMoves()) {
+
+                    //find how much pressure is currently on our piece
+                    if(threat.TargetSquare == move.StartSquare) {
+                        value += OLD_ATTACKERS;
+                    }
+
+                    //find how much pressure our opponents have on all our pieces before we move
+                    value += OLD_THREATS * Material(threat.CapturePieceType);
+                }
                 board.UndoSkipTurn();
             }
 
@@ -148,6 +158,9 @@ public class MyBot : IChessBot
                 opponentThreats += NEW_ATTACKERS;
             }
 
+            //find how much pressure our opponents have on all our pieces after we move
+            opponentThreats += NEW_THREATS * Material(move.CapturePieceType);
+
             board.MakeMove(move);
             if (board.IsInCheckmate())
             {
@@ -168,37 +181,50 @@ public class MyBot : IChessBot
         board.ForceSkipTurn();
         double totalConsequence = 0;
 
-        //2 symbols less to do it like this
         //new threats we create
-        foreach (Move move in board.GetLegalMoves().Where(threat => threat.StartSquare == currentSquare))
+        foreach (Move move in board.GetLegalMoves())
         {
-            if (move.IsCapture)
+            if (move.StartSquare == currentSquare && move.IsCapture)
             {
                 totalConsequence += NEW_ATTACKS * Material(move.CapturePieceType);
             }
-            else totalConsequence += NEW_MOVES;
+
+            totalConsequence += NEW_MOVES;
         }
 
         //find new pieces we defend
         string fen = board.GetFenString();
         PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
+        totalConsequence += findDefendedPieces(board, currentSquare, NEW_DEFENSE);
+
+        board.UndoSkipTurn();
+
+        return totalConsequence;
+    }
+
+    private double findDefendedPieces(Board board, Square currentSquare, double multiplier) {
+        double sum = 0;
+        string fen = board.GetFenString();
+        PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
+
         foreach (PieceList pieceList in pieceLists)
         {
-            foreach (Piece p in pieceList.Where(p => !p.IsKing && !(p.Square == currentSquare)))
+            foreach (Piece p in pieceList)
             {
-                foreach (Move defence in ScapeGoat(fen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
+                if (!p.IsKing && !(p.Square == currentSquare))
                 {
-                    if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
+                    foreach (Move defence in ScapeGoat(fen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
                     {
-                        totalConsequence += NEW_DEFENSE * Material(p.PieceType);
+                        if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
+                        {
+                            sum += multiplier * Material(p.PieceType);
+                        }
                     }
                 }
             }
         }
 
-        board.UndoSkipTurn();
-
-        return totalConsequence;
+        return sum;
     }
 }
