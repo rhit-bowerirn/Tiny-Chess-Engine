@@ -21,7 +21,7 @@ namespace ChessChallenge.Application
             EvilBot
         }
 
-        int gamesToPlay = 2;
+        int gamesToPlay = 10;
 
         // Game state
         readonly Random rng;

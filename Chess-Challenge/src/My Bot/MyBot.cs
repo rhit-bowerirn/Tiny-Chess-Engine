@@ -10,10 +10,10 @@ public class MyBot : IChessBot
 
     Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
 
-    // how much to add for each of our pieces defending the new square.
+    // how much to multiply for each of our pieces defending the new square.
     double NEW_DEFENDERS = 10.0; // default is 10
 
-    // how much to subtract for each of their pieces attacking the new square.
+    // how much to multply for each of their pieces attacking the new square.
     double NEW_ATTACKERS = 10.0; // default is 10
 
     // multiplier weight for the material weight of pieces we start defending
@@ -44,7 +44,7 @@ public class MyBot : IChessBot
     //NOT IMPLEMENTED YET
     double OLD_ATTACKS = 1.0; // default is 1
 
-    // how much we add for each of their pieces attacking the old square
+    // how much we multiply for each of their pieces attacking the old square
     double OLD_ATTACKERS = 10.0; // default is 10
 
     // how much we subtract for each of the squares we used to be able to move to
@@ -74,7 +74,7 @@ public class MyBot : IChessBot
     public Move Think(Board board, Timer timer)
     {
         readWeightsFromFile();
-        
+
         Move[] moves = board.GetLegalMoves();
         double[] moveEvals = new double[moves.Length];
         double maxValue = double.MinValue;
@@ -89,8 +89,8 @@ public class MyBot : IChessBot
                         + CAPTURE_WEIGHT * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
                         + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
                             PROMOTION_WEIGHT * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
-                            : -RELINQUISHED_CONTROL) //subtract relinquished control
-                        + NEW_DEFENDERS * ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
+                            : -10 * RELINQUISHED_CONTROL) //subtract relinquished control
+                        + 10*  NEW_DEFENDERS * ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
                             .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) //count the number of defenders - our control
                         - findDefendedPieces(board, move.StartSquare, OLD_DEFENSE);                            
 
@@ -115,7 +115,7 @@ public class MyBot : IChessBot
 
                     //find how much pressure is currently on our piece
                     if(threat.TargetSquare == move.StartSquare) {
-                        value += OLD_ATTACKERS;
+                        value += 10 * OLD_ATTACKERS;
                     }
 
                     //find how much pressure our opponents have on all our pieces before we move
@@ -158,7 +158,7 @@ public class MyBot : IChessBot
             //opponent piece puts pressure on the square
             if (move.TargetSquare == currentSquare)
             {
-                opponentThreats += NEW_ATTACKERS;
+                opponentThreats += 10 * NEW_ATTACKERS;
             }
 
             //find how much pressure our opponents have on all our pieces after we move
