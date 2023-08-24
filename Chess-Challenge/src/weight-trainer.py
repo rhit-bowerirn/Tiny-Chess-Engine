@@ -7,7 +7,7 @@ pop_size = 20
 num_parents_mating = pop_size - 1
 parent_selection_type = "rank" # sss, rws, sus, rank, random, tournament
 keep_parents = 0
-keep_elitism = 0
+keep_elitism = 1
 
 crossover_type = "uniform" #single_point, two_points, uniform, scattered, None
 crossover_probability = 0.6
@@ -20,7 +20,7 @@ mutation_high_change = 4
 num_weights = 16 
 weight_type = float #int or float
 init_range_low = 0
-init_range_high = 5
+init_range_high = 10
 
 os.chdir("Chess-Challenge/")
 weight_path = "src/My Bot/weights.txt"  
@@ -34,7 +34,7 @@ def fitness_func(ga_instance, solution, solution_idx):
     # run chess code and read results
     result = subprocess.run(["dotnet", "run"], capture_output=True, text=True, check=False)
     fitness = float(result.stdout)
-    print(solution, " ", fitness)
+    print("Bot ", solution_idx, " in gen. ", ga_instance.generations_completed , " has fitness ", fitness, " and weights ", solution)
     return fitness
 
 def on_generation(ga_instance):
@@ -62,7 +62,6 @@ ga_instance = pygad.GA(num_generations=num_generations,
                        random_mutation_max_val=mutation_high_change,
                        allow_duplicate_genes=True,
                        save_best_solutions=True,
-                       save_solutions=True,
                        on_generation=on_generation)
 
 ga_instance.run()
