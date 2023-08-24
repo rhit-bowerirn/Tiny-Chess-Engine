@@ -24,6 +24,8 @@ init_range_high = 10
 
 os.chdir("Chess-Challenge/")
 weight_path = "src/My Bot/weights.txt"  
+log_path = "../log.txt"
+open(log_path, "w").close() # clears log file
 
 def fitness_func(ga_instance, solution, solution_idx):
     # set up weights in file
@@ -34,13 +36,14 @@ def fitness_func(ga_instance, solution, solution_idx):
     # run chess code and read results
     result = subprocess.run(["dotnet", "run"], capture_output=True, text=True, check=False)
     fitness = float(result.stdout)
-    print("Bot ", solution_idx, " in gen. ", ga_instance.generations_completed , " has fitness ", fitness, " and weights ", solution)
+    print("Bot ", solution_idx, " in gen. ", ga_instance.generations_completed , " has fitness ", fitness, " and weights ", *solution, 
+          file=open(log_path, 'a'))
     return fitness
 
 def on_generation(ga_instance):
-    print("Finished generation ", ga_instance.generations_completed)
-    print("Fitnesses: ", ga_instance.last_generation_fitness)
-    print("Best solution weights: ", ga_instance.best_solutions[-1])
+    print("Finished generation ", ga_instance.generations_completed, file=open(log_path, 'a'))
+    print("Fitnesses: ", *ga_instance.last_generation_fitness, file=open(log_path, 'a'))
+    print("Best solution weights: ", *ga_instance.best_solutions[-1], file=open(log_path, 'a'))
 
 
 ga_instance = pygad.GA(num_generations=num_generations,
@@ -67,8 +70,8 @@ ga_instance = pygad.GA(num_generations=num_generations,
 ga_instance.run()
 
 solution, solution_fitness, solution_idx = ga_instance.best_solution()
-print("Parameters of the best solution : {solution}".format(solution=solution))
-print("Fitness value of the best solution = {solution_fitness}".format(solution_fitness=solution_fitness))
+print("Parameters of the best solution : {solution}".format(solution=solution), file=open(log_path, 'a'))
+print("Fitness value of the best solution = {solution_fitness}".format(solution_fitness=solution_fitness), file=open(log_path, 'a'))
 
 os.chdir("..")
 if not os.path.exists("plots"): 
