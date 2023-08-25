@@ -17,25 +17,33 @@ public class MyBot : IChessBot
     public Move Think(Board board, Timer timer)
     {
         Move[] moves = board.GetLegalMoves();
-        double[] moveEvals = moves.Select(move => negamax(board, move, 3)).ToArray();
+        double[] moveEvals = moves.Select(move => negamax(board, move, 3, double.MinValue, double.MaxValue)).ToArray();
         Move[] topMoves = moves.Where((move, i) => moveEvals[i] >= moveEvals.Max()).ToArray();
         return topMoves[new Random().Next(0, topMoves.Length)];
     }
 
-    public double negamax(Board b, Move m, int depth)
+    public double negamax(Board board, Move m, int depth,  double a, double b)
     {
-        b.MakeMove(m);
-        Move[] next = bestMoves(b);
-        // Console.WriteLine("best: {0}", next.Length);
+        board.MakeMove(m);
+        Move[] next = bestMoves(board);
+        //reverse to get most promising nodes first
+        Array.Reverse(next);
 
         if (depth == 0 || next.Length == 0)
         {
-            b.UndoMove(m);
-            return evaluateMove(b, m);
+            board.UndoMove(m);
+            return evaluateMove(board, m);
         }
         
-        double val = next.Max(n => -negamax(b, n, depth - 1));
-        b.UndoMove(m);
+        // double val = next.Max(n => -negamax(b, n, depth - 1));
+        double val = double.MinValue;
+        foreach (Move n in next) {
+            val = Math.Max(val, -negamax(board, n, depth - 1, b, a));
+            a = Math.Max(a, val);
+            if (a >= b)
+                break;
+        }
+        board.UndoMove(m);
         return val;
     }
 
@@ -53,7 +61,10 @@ public class MyBot : IChessBot
             maxValue = Math.Max(maxValue, moveEvals[i]);
         }
 
-        return moves.Where((move, i) => moveEvals[i] >= 0.98 * maxValue).ToArray();
+        // needed bc alpha-beta pruning searches through most promising nodes first
+        // we'll flip the order in the negamax function, since its hard to reverse both arrays at the same
+        Array.Sort(moveEvals, moves);
+        return moves.Where((move, i) => moveEvals[i] >= 0.95 * maxValue).ToArray();
     }
 
     private double evaluateMove(Board board, Move move)
