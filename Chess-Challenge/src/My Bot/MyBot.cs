@@ -10,54 +10,59 @@ public class MyBot : IChessBot
 
     Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
 
-    // how much to multiply for each of our pieces defending the new square.
-    const double NEW_DEFENDERS = 64.6966253; // default is 10
+    double[] w = new double[] {6.46966253, 4.28272843, 2.45141429, 5.43149072 , 3.40353213 , 2.67461549,
+            0.59151037,  6.08796703, 6.80125667, 2.94047109, 6.05383843,
+            8.1924716, 3.42285553, 8.0929267, 9.4478703, 3.37456005};
+    
 
-    // how much to multiply for each of their pieces attacking the new square.
-    const double NEW_ATTACKERS = 42.8272843; // default is 10
+    // // how much to multiply for each of our pieces defending the new square.
+    // const double NEW_DEFENDERS = 64.6966253; // default is 10
 
-    // multiplier weight for the material weight of pieces we start defending
-    const double NEW_DEFENSE = 2.45141429; // default is 1
+    // // how much to multiply for each of their pieces attacking the new square.
+    // const double NEW_ATTACKERS = 42.8272843; // default is 10
 
-    // multiplier weight for the material weight of pieces we start attacking
-    const double NEW_ATTACKS = 5.43149072; // default is 1
+    // // multiplier weight for the material weight of pieces we start defending
+    // const double NEW_DEFENSE = 2.45141429; // default is 1
 
-    // multiplier weight for the number of squares we can now move to
-    const double NEW_MOVES = 3.40353213; // default is 1
+    // // multiplier weight for the material weight of pieces we start attacking
+    // const double NEW_ATTACKS = 5.43149072; // default is 1
 
-    // how much we subtract for giving up control of a square
-    const double RELINQUISHED_CONTROL = 81.924716; // default is 10
+    // // multiplier weight for the number of squares we can now move to
+    // const double NEW_MOVES = 3.40353213; // default is 1
 
-    // multiplier weight for the material weight of piece we are risking
-    const double RISK_WEIGHT = 3.42285553; // default is 1
+    // // how much we subtract for giving up control of a square
+    // const double RELINQUISHED_CONTROL = 81.924716; // default is 10
 
-    // multiplier weight for the material weight of piece we are capturing
-    const double CAPTURE_WEIGHT = 8.0929267; // default is 1
+    // // multiplier weight for the material weight of piece we are risking
+    // const double RISK_WEIGHT = 3.42285553; // default is 1
 
-    // multiplier weight to encourage promotion
-    const double PROMOTION_WEIGHT = 9.4478703; // default is 1
+    // // multiplier weight for the material weight of piece we are capturing
+    // const double CAPTURE_WEIGHT = 8.0929267; // default is 1
 
-    // multiplier weight for the material weight of pieces we stop defending
-    const double OLD_DEFENSE = 0.59151037; // default is 1
+    // // multiplier weight to encourage promotion
+    // const double PROMOTION_WEIGHT = 9.4478703; // default is 1
 
-    // multiplier weight for the material weight of pieces we stop attacking
-    //NOT IMPLEMENTED YET
-    const double OLD_ATTACKS = 6.08796703; // default is 1
+    // // multiplier weight for the material weight of pieces we stop defending
+    // const double OLD_DEFENSE = 0.59151037; // default is 1
 
-    // how much we multiply for each of their pieces attacking the old square
-    const double OLD_ATTACKERS = 68.0125667; // default is 10
+    // // multiplier weight for the material weight of pieces we stop attacking
+    // //NOT IMPLEMENTED YET
+    // const double OLD_ATTACKS = 6.08796703; // default is 1
 
-    // how much we subtract for each of the squares we used to be able to move to
-    const double OLD_MOVES = 2.94047109; // default is 1
+    // // how much we multiply for each of their pieces attacking the old square
+    // const double OLD_ATTACKERS = 68.0125667; // default is 10
 
-    // multiplier for captures our opponent can currently make
-    const double OLD_THREATS = 6.05383843;
+    // // how much we subtract for each of the squares we used to be able to move to
+    // const double OLD_MOVES = 2.94047109; // default is 1
 
-    // multiplier for the captures our opponent will be able to make
-    const double NEW_THREATS = 2.67461549;
+    // // multiplier for captures our opponent can currently make
+    // const double OLD_THREATS = 6.05383843;
 
-    // weight to encourage castling
-    const double CASTLE_BONUS = 3.37456005; // default is 1;
+    // // multiplier for the captures our opponent will be able to make
+    // const double NEW_THREATS = 2.67461549;
+
+    // // weight to encourage castling
+    // const double CASTLE_BONUS = 3.37456005; // default is 1;
 
     public Move Think(Board board, Timer timer)
     {
@@ -103,33 +108,25 @@ public class MyBot : IChessBot
     private double evaluateMove(Board board, Move move)
     {
         //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
-        double value = -RISK_WEIGHT * Material(move.MovePieceType) //subtract material risk - material cost
-                    + CAPTURE_WEIGHT * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
+        double value = -w[12] * Material(move.MovePieceType) //subtract material risk - material cost
+                    + w[13] * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
                     + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
-                        PROMOTION_WEIGHT * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
-                        : -RELINQUISHED_CONTROL) //subtract relinquished control
-                    + NEW_DEFENDERS * ScapeGoat(board, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
+                        w[14] * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
+                        : -w[11]) //subtract relinquished control
+                    + w[0] * ScapeGoat(board, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
                         .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) //count the number of defenders - our control
-                    - findDefendedPieces(board, move.StartSquare, OLD_DEFENSE);
+                    - findDefendedPieces(board, move.StartSquare, w[6]);
 
         if (move.IsCastles)
-        {
-            value += CASTLE_BONUS;
-        }
+            value += w[15];
 
         if (move.IsPromotion)
-        {
             value += Material(move.PromotionPieceType);
-        }
 
         foreach (Move m in board.GetLegalMoves())
-        {
             if (m.StartSquare == move.StartSquare)
-            {
-                value -= OLD_MOVES + OLD_ATTACKS * Material(m.CapturePieceType);
-            }
-        }
-
+                value -= w[9] + w[7] * Material(m.CapturePieceType);
+                
         if (board.TrySkipTurn())
         {
             foreach (Move threat in board.GetLegalMoves())
@@ -137,12 +134,10 @@ public class MyBot : IChessBot
 
                 //find how much pressure is currently on our piece
                 if (threat.TargetSquare == move.StartSquare)
-                {
-                    value += OLD_ATTACKERS;
-                }
+                    value += w[8];
 
                 //find how much pressure our opponents have on all our pieces before we move
-                value += OLD_THREATS * Material(threat.CapturePieceType);
+                value += w[10] * Material(threat.CapturePieceType);
             }
             board.UndoSkipTurn();
         }
@@ -185,16 +180,14 @@ public class MyBot : IChessBot
         {
             //opponent piece puts pressure on the square
             if (move.TargetSquare == currentSquare)
-            {
-                opponentThreats += NEW_ATTACKERS;
-            }
+                opponentThreats += w[1];
 
             //find how much pressure our opponents have on all our pieces after we move
-            opponentThreats += NEW_THREATS * Material(move.CapturePieceType);
+            opponentThreats += w[5] * Material(move.CapturePieceType);
 
             board.MakeMove(move);
             if (board.IsInCheckmate())
-            {
+            { 
                 opponentThreats += 1000;
                 board.UndoMove(move);
                 break;
@@ -216,18 +209,16 @@ public class MyBot : IChessBot
         foreach (Move move in board.GetLegalMoves())
         {
             if (move.StartSquare == currentSquare && move.IsCapture)
-            {
-                totalConsequence += NEW_ATTACKS * Material(move.CapturePieceType);
-            }
+                totalConsequence += w[3] * Material(move.CapturePieceType);
 
-            totalConsequence += NEW_MOVES;
+            totalConsequence += w[4];
         }
 
         //find new pieces we defend
         // string fen = board.GetFenString();
         // PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
-        totalConsequence += findDefendedPieces(board, currentSquare, NEW_DEFENSE);
+        totalConsequence += findDefendedPieces(board, currentSquare, w[2]);
 
         board.UndoSkipTurn();
 
@@ -240,21 +231,11 @@ public class MyBot : IChessBot
         PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
         foreach (PieceList pieceList in pieceLists)
-        {
             foreach (Piece p in pieceList)
-            {
                 if (!(p.IsKing || p.Square == currentSquare))
-                {
                     foreach (Move defence in ScapeGoat(board, p.Square, !board.IsWhiteToMove).GetLegalMoves())
-                    {
                         if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
-                        {
                             sum += multiplier * Material(p.PieceType);
-                        }
-                    }
-                }
-            }
-        }
 
         return sum;
     }
