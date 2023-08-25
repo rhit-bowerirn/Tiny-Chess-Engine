@@ -11,10 +11,10 @@ public class MyBot : IChessBot
     Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
 
     // how much to multiply for each of our pieces defending the new square.
-    const double NEW_DEFENDERS = 10 * 6.46966253; // default is 10
+    const double NEW_DEFENDERS = 64.6966253; // default is 10
 
     // how much to multiply for each of their pieces attacking the new square.
-    const double NEW_ATTACKERS = 10 * 4.28272843; // default is 10
+    const double NEW_ATTACKERS = 42.8272843; // default is 10
 
     // multiplier weight for the material weight of pieces we start defending
     const double NEW_DEFENSE = 2.45141429; // default is 1
@@ -26,7 +26,7 @@ public class MyBot : IChessBot
     const double NEW_MOVES = 3.40353213; // default is 1
 
     // how much we subtract for giving up control of a square
-    const double RELINQUISHED_CONTROL = 10 * 8.1924716; // default is 10
+    const double RELINQUISHED_CONTROL = 81.924716; // default is 10
 
     // multiplier weight for the material weight of piece we are risking
     const double RISK_WEIGHT = 3.42285553; // default is 1
@@ -45,7 +45,7 @@ public class MyBot : IChessBot
     const double OLD_ATTACKS = 6.08796703; // default is 1
 
     // how much we multiply for each of their pieces attacking the old square
-    const double OLD_ATTACKERS = 10 * 6.80125667; // default is 10
+    const double OLD_ATTACKERS = 68.0125667; // default is 10
 
     // how much we subtract for each of the squares we used to be able to move to
     const double OLD_MOVES = 2.94047109; // default is 1
@@ -59,34 +59,26 @@ public class MyBot : IChessBot
     // weight to encourage castling
     const double CASTLE_BONUS = 3.37456005; // default is 1;
 
-
-    const int SEARCH_DEPTH = 3;
-
     public Move Think(Board board, Timer timer)
     {
         Move[] moves = board.GetLegalMoves();
-        double[] moveEvals = moves.Select(move => negamax(board, move, SEARCH_DEPTH, )).ToArray();
-        double maxValue = moveEvals.Max();
-        Move[] topMoves = moves.Where((move, i) => moveEvals[i] >= maxValue).ToArray();
+        double[] moveEvals = moves.Select(move => negamax(board, move, 3)).ToArray();
+        Move[] topMoves = moves.Where((move, i) => moveEvals[i] >= moveEvals.Max()).ToArray();
         return topMoves[new Random().Next(0, topMoves.Length)];
     }
 
-    public double negamax(Board b, Move m, int depth, bool isUs)
+    public double negamax(Board b, Move m, int depth)
     {
         b.MakeMove(m);
         Move[] next = bestMoves(b);
 
-        double val = double.MinValue;
         if (depth == 0 || next.Length == 0)
         {
             b.UndoMove(m);
-            val = (isUs ? 1 : -1) * evaluateMove(b, m);
-            return val;
+            return evaluateMove(b, m);
         }
         
-        foreach(Move n in next) {
-            val = Math.Max(val, -negamax(b, n, depth-1, !isUs));
-        }
+        double val = next.Max(n => -negamax(b, n, depth - 1));
         b.UndoMove(m);
         return val;
     }
@@ -110,14 +102,13 @@ public class MyBot : IChessBot
 
     private double evaluateMove(Board board, Move move)
     {
-        string currentFen = board.GetFenString();
         //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
         double value = -RISK_WEIGHT * Material(move.MovePieceType) //subtract material risk - material cost
                     + CAPTURE_WEIGHT * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
                     + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
                         PROMOTION_WEIGHT * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
                         : -RELINQUISHED_CONTROL) //subtract relinquished control
-                    + NEW_DEFENDERS * ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
+                    + NEW_DEFENDERS * ScapeGoat(board, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
                         .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) //count the number of defenders - our control
                     - findDefendedPieces(board, move.StartSquare, OLD_DEFENSE);
 
@@ -135,8 +126,7 @@ public class MyBot : IChessBot
         {
             if (m.StartSquare == move.StartSquare)
             {
-                value -= OLD_MOVES;
-                value -= OLD_ATTACKS * Material(m.CapturePieceType);
+                value -= OLD_MOVES + OLD_ATTACKS * Material(m.CapturePieceType);
             }
         }
 
@@ -166,8 +156,7 @@ public class MyBot : IChessBot
             return double.MaxValue;
         }
 
-        value -= CalculateOpponentResponse(board, move.TargetSquare); //find the number of attackers - opponent control
-        value += CalculateFuturePlans(board, move.TargetSquare); //new pieces we defend and attack
+        value += CalculateFuturePlans(board, move.TargetSquare) - CalculateOpponentResponse(board, move.TargetSquare);
 
         board.UndoMove(move);
         
@@ -177,9 +166,9 @@ public class MyBot : IChessBot
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
     // This is used to find all the pieces that control a given square
     // En passant doesn't need to be accounted for here
-    private Board ScapeGoat(string fen, Square square, bool pieceIsWhite)
+    private Board ScapeGoat(Board board, Square square, bool pieceIsWhite)
     {
-        string[] rows = fen.Split('/');
+        string[] rows = board.GetFenString().Split('/');
         StringBuilder newRow = new(Regex.Replace(rows[7 - square.Rank], @"\d+", match => new string('1', int.Parse(match.Value))));
         newRow[square.File] = pieceIsWhite ? 'B' : 'b';
         rows[7 - square.Rank] = Regex.Replace(newRow.ToString(), "1+", match => match.Value.Length.ToString());
@@ -235,8 +224,8 @@ public class MyBot : IChessBot
         }
 
         //find new pieces we defend
-        string fen = board.GetFenString();
-        PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
+        // string fen = board.GetFenString();
+        // PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
         totalConsequence += findDefendedPieces(board, currentSquare, NEW_DEFENSE);
 
@@ -248,7 +237,6 @@ public class MyBot : IChessBot
     private double findDefendedPieces(Board board, Square currentSquare, double multiplier)
     {
         double sum = 0;
-        string fen = board.GetFenString();
         PieceList[] pieceLists = board.GetAllPieceLists().Where(pl => pl.IsWhitePieceList == board.IsWhiteToMove).ToArray();
 
         foreach (PieceList pieceList in pieceLists)
@@ -257,7 +245,7 @@ public class MyBot : IChessBot
             {
                 if (!p.IsKing && !(p.Square == currentSquare))
                 {
-                    foreach (Move defence in ScapeGoat(fen, p.Square, !board.IsWhiteToMove).GetLegalMoves())
+                    foreach (Move defence in ScapeGoat(board, p.Square, !board.IsWhiteToMove).GetLegalMoves())
                     {
                         if (defence.StartSquare.Index == currentSquare.Index && defence.TargetSquare.Index == p.Square.Index)
                         {
