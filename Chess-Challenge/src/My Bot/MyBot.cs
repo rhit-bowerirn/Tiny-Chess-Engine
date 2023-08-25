@@ -60,98 +60,118 @@ public class MyBot : IChessBot
     const double CASTLE_BONUS = 3.37456005; // default is 1;
 
 
-    const int SEARCH_DEPTH = 5;
+    const int SEARCH_DEPTH = 3;
 
     public Move Think(Board board, Timer timer)
     {
-        for(int i = 0; i < SEARCH_DEPTH; i++) { //less token to do recursive call?
-            
-        }
+        Move[] moves = board.GetLegalMoves();
+        double[] moveEvals = moves.Select(move => negamax(board, move, SEARCH_DEPTH, )).ToArray();
+        double maxValue = moveEvals.Max();
+        Move[] topMoves = moves.Where((move, i) => moveEvals[i] >= maxValue).ToArray();
+        return topMoves[new Random().Next(0, topMoves.Length)];
     }
 
-    public double negamax(Board b, Move m, int depth, bool isWhite) {
+    public double negamax(Board b, Move m, int depth, bool isUs)
+    {
         b.MakeMove(m);
-        Move[] next
-        if (depth == 0 )
+        Move[] next = bestMoves(b);
+
+        double val = double.MinValue;
+        if (depth == 0 || next.Length == 0)
+        {
+            b.UndoMove(m);
+            val = (isUs ? 1 : -1) * evaluateMove(b, m);
+            return val;
+        }
+        
+        foreach(Move n in next) {
+            val = Math.Max(val, -negamax(b, n, depth-1, !isUs));
+        }
+        b.UndoMove(m);
+        return val;
     }
 
-    private Move[] evaluatePosition(Board board)
+    private Move[] bestMoves(Board board)
     {
         Move[] moves = board.GetLegalMoves();
         double[] moveEvals = new double[moves.Length];
         double maxValue = double.MinValue;
-        string currentFen = board.GetFenString();
+
 
         for (int i = 0; i < moves.Length; i++)
         {
-            Move move = moves[i];
-
-            //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
-            double value = -RISK_WEIGHT * Material(move.MovePieceType) //subtract material risk - material cost
-                        + CAPTURE_WEIGHT * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
-                        + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
-                            PROMOTION_WEIGHT * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
-                            : -RELINQUISHED_CONTROL) //subtract relinquished control
-                        + NEW_DEFENDERS * ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
-                            .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) //count the number of defenders - our control
-                        - findDefendedPieces(board, move.StartSquare, OLD_DEFENSE);
-
-            if (move.IsCastles)
-            {
-                value += CASTLE_BONUS;
-            }
-
-            if (move.IsPromotion)
-            {
-                value += Material(move.PromotionPieceType);
-            }
-
-            foreach (Move m in moves)
-            {
-                if (m.StartSquare == move.StartSquare)
-                {
-                    value -= OLD_MOVES;
-                    value -= OLD_ATTACKS * Material(m.CapturePieceType);
-                }
-            }
-
-            if (board.TrySkipTurn())
-            {
-                foreach (Move threat in board.GetLegalMoves())
-                {
-
-                    //find how much pressure is currently on our piece
-                    if (threat.TargetSquare == move.StartSquare)
-                    {
-                        value += OLD_ATTACKERS;
-                    }
-
-                    //find how much pressure our opponents have on all our pieces before we move
-                    value += OLD_THREATS * Material(threat.CapturePieceType);
-                }
-                board.UndoSkipTurn();
-            }
-
-
-            board.MakeMove(move);
-
-            if (board.IsInCheckmate()) //found winning move
-            {
-                board.UndoMove(move);
-                value += 1000;
-            }
-
-            value -= CalculateOpponentResponse(board, move.TargetSquare); //find the number of attackers - opponent control
-            value += CalculateFuturePlans(board, move.TargetSquare); //new pieces we defend and attack
-
-            board.UndoMove(move);
-
-            moveEvals[i] = value;
-            maxValue = Math.Max(maxValue, value);
+            moveEvals[i] = evaluateMove(board, moves[i]);
+            maxValue = Math.Max(maxValue, moveEvals[i]);
         }
 
         //return moves
-        return moves.Where((move, i) => moveEvals[i] >= 0.9 * maxValue).ToArray();
+        return moves.Where((move, i) => moveEvals[i] >= 0.98 * maxValue).ToArray();
+    }
+
+    private double evaluateMove(Board board, Move move)
+    {
+        string currentFen = board.GetFenString();
+        //we relinquish control of the square we move to and risk our Material (I added Material of capture piece and promotion)
+        double value = -RISK_WEIGHT * Material(move.MovePieceType) //subtract material risk - material cost
+                    + CAPTURE_WEIGHT * Material(move.CapturePieceType) //gain captured material, if there is any - material cost
+                    + ((move.MovePieceType == PieceType.Pawn && !move.IsCapture) ?
+                        PROMOTION_WEIGHT * (board.IsWhiteToMove ? move.TargetSquare.Rank : 7 - move.TargetSquare.Rank) //encourage pawns to promote
+                        : -RELINQUISHED_CONTROL) //subtract relinquished control
+                    + NEW_DEFENDERS * ScapeGoat(currentFen, move.TargetSquare, !board.IsWhiteToMove).GetLegalMoves()
+                        .Count(m => m.TargetSquare.Index == move.TargetSquare.Index) //count the number of defenders - our control
+                    - findDefendedPieces(board, move.StartSquare, OLD_DEFENSE);
+
+        if (move.IsCastles)
+        {
+            value += CASTLE_BONUS;
+        }
+
+        if (move.IsPromotion)
+        {
+            value += Material(move.PromotionPieceType);
+        }
+
+        foreach (Move m in board.GetLegalMoves())
+        {
+            if (m.StartSquare == move.StartSquare)
+            {
+                value -= OLD_MOVES;
+                value -= OLD_ATTACKS * Material(m.CapturePieceType);
+            }
+        }
+
+        if (board.TrySkipTurn())
+        {
+            foreach (Move threat in board.GetLegalMoves())
+            {
+
+                //find how much pressure is currently on our piece
+                if (threat.TargetSquare == move.StartSquare)
+                {
+                    value += OLD_ATTACKERS;
+                }
+
+                //find how much pressure our opponents have on all our pieces before we move
+                value += OLD_THREATS * Material(threat.CapturePieceType);
+            }
+            board.UndoSkipTurn();
+        }
+
+
+        board.MakeMove(move);
+
+        if (board.IsInCheckmate()) //found winning move
+        {
+            board.UndoMove(move);
+            return double.MaxValue;
+        }
+
+        value -= CalculateOpponentResponse(board, move.TargetSquare); //find the number of attackers - opponent control
+        value += CalculateFuturePlans(board, move.TargetSquare); //new pieces we defend and attack
+
+        board.UndoMove(move);
+        
+        return value;
     }
 
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
