@@ -83,7 +83,7 @@ public class MyBot : IChessBot
             return evaluateMove(b, m);
         }
         
-        double val = next.Max(n => -negamax(b, n, --depth));
+        double val = next.Max(n => -negamax(b, n, depth - 1));
         b.UndoMove(m);
         return val;
     }
@@ -126,7 +126,7 @@ public class MyBot : IChessBot
         foreach (Move m in board.GetLegalMoves())
             if (m.StartSquare == move.StartSquare)
                 value -= w[9] + w[7] * Material(m.CapturePieceType);
-                
+
         if (board.TrySkipTurn())
         {
             foreach (Move threat in board.GetLegalMoves())
