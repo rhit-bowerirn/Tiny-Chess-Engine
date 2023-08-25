@@ -102,7 +102,42 @@ public class MyBot : IChessBot
             return double.MaxValue;
         }
 
-        value += CalculateFuture(board, move.TargetSquare);
+        // value += CalculateFuture(board, move.TargetSquare);
+        // Combined CalculateFuturePlans and CalculateOpponentResponse here to save tokens
+        Square currentSquare = move.TargetSquare;
+
+        // This is where we skip our opponents next turn to see how our move affects us
+        board.ForceSkipTurn();
+        //new threats we create
+        foreach (Move m in board.GetLegalMoves())
+        {
+            if (m.StartSquare == currentSquare && m.IsCapture)
+                value += w[3] * Material(m.CapturePieceType);
+
+            value += w[4];
+        }
+        value += findDefendedPieces(board, currentSquare, w[2]);
+        board.UndoSkipTurn();
+
+        // Calculates all the dangers the opponent can create on their turn
+        foreach (Move m in board.GetLegalMoves())
+        {
+            //opponent piece puts pressure on the square
+            if (m.TargetSquare == currentSquare)
+                value -= w[1];
+
+            //find how much pressure our opponents have on all our pieces after we move
+            value -= w[5] * Material(m.CapturePieceType);
+
+            board.MakeMove(m);
+            if (board.IsInCheckmate())
+            { 
+                value -= 1000;
+                board.UndoMove(m);
+                break;
+            }
+            board.UndoMove(m);
+        }
 
         board.UndoMove(move);
         
@@ -119,51 +154,6 @@ public class MyBot : IChessBot
         newRow[square.File] = pieceIsWhite ? 'B' : 'b';
         rows[7 - square.Rank] = Regex.Replace(newRow.ToString(), "1+", match => match.Value.Length.ToString());
         return Board.CreateBoardFromFEN(string.Join("/", rows)).GetLegalMoves();
-    }
-
-    // ***Assumes the move has already been made on the board***
-    // Combines CalculateFuturePlans and CalculateOpponentResponse to save tokens
-    // This is where we skip our opponents next turn to see how our move affects us
-    // Calculates all the dangers the opponent can create on their turn
-    private double CalculateFuture(Board board, Square currentSquare)
-    {
-        board.ForceSkipTurn();
-        double totalConsequence = 0;
-
-        //new threats we create
-        foreach (Move move in board.GetLegalMoves())
-        {
-            if (move.StartSquare == currentSquare && move.IsCapture)
-                totalConsequence += w[3] * Material(move.CapturePieceType);
-
-            totalConsequence += w[4];
-        }
-
-        totalConsequence += findDefendedPieces(board, currentSquare, w[2]);
-
-        board.UndoSkipTurn();
-
-        //calculate opponent's control of the square
-        foreach (Move move in board.GetLegalMoves())
-        {
-            //opponent piece puts pressure on the square
-            if (move.TargetSquare == currentSquare)
-                totalConsequence -= w[1];
-
-            //find how much pressure our opponents have on all our pieces after we move
-            totalConsequence -= w[5] * Material(move.CapturePieceType);
-
-            board.MakeMove(move);
-            if (board.IsInCheckmate())
-            { 
-                totalConsequence -= 1000;
-                board.UndoMove(move);
-                break;
-            }
-            board.UndoMove(move);
-        }
-
-        return totalConsequence;
     }
 
     private double findDefendedPieces(Board board, Square currentSquare, double multiplier)
