@@ -9,54 +9,54 @@ public class MyBot : IChessBot
 
     Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
 
-    // how much to add for each of our pieces defending the new square.
-    const double NEW_DEFENDERS = 10.0; // default is 10
+    // how much to multiply for each of our pieces defending the new square.
+    const double NEW_DEFENDERS = 6.46966253; // default is 10
 
-    // how much to subtract for each of their pieces attacking the new square.
-    const double NEW_ATTACKERS = 10.0; // default is 10
+    // how much to multiply for each of their pieces attacking the new square.
+    const double NEW_ATTACKERS = 4.28272843; // default is 10
 
     // multiplier weight for the material weight of pieces we start defending
-    const double NEW_DEFENSE = 1.0; // default is 1
+    const double NEW_DEFENSE = 2.45141429; // default is 1
 
     // multiplier weight for the material weight of pieces we start attacking
-    const double NEW_ATTACKS = 2.0; // default is 1
+    const double NEW_ATTACKS = 5.43149072; // default is 1
 
     // multiplier weight for the number of squares we can now move to
-    const double NEW_MOVES = 1.0; // default is 1
+    const double NEW_MOVES = 3.40353213; // default is 1
 
     // how much we subtract for giving up control of a square
     const double RELINQUISHED_CONTROL = 10.0; // default is 10
 
     // multiplier weight for the material weight of piece we are risking
-    const double RISK_WEIGHT = 1.0; // default is 1
+    const double RISK_WEIGHT = 3.42285553; // default is 1
 
     // multiplier weight for the material weight of piece we are capturing
-    const double CAPTURE_WEIGHT = 3.0; // default is 1
+    const double CAPTURE_WEIGHT = 8.0929267; // default is 1
 
     // multiplier weight to encourage promotion
-    const double PROMOTION_WEIGHT = 1.0; // default is 1
+    const double PROMOTION_WEIGHT = 9.4478703; // default is 1
 
     // multiplier weight for the material weight of pieces we stop defending
-    const double OLD_DEFENSE = 1.0; // default is 1
+    const double OLD_DEFENSE = 0.59151037; // default is 1
 
     // multiplier weight for the material weight of pieces we stop attacking
     //NOT IMPLEMENTED YET
-    const double OLD_ATTACKS = 1.0; // default is 1
+    const double OLD_ATTACKS = 6.08796703; // default is 1
 
-    // how much we add for each of their pieces attacking the old square
-    const double OLD_ATTACKERS = 10.0; // default is 10
+    // how much we multiply for each of their pieces attacking the old square
+    const double OLD_ATTACKERS = 6.80125667; // default is 10
 
     // how much we subtract for each of the squares we used to be able to move to
-    const double OLD_MOVES = 1.0; // default is 1
+    const double OLD_MOVES = 2.94047109; // default is 1
 
-    //multiplier for captures our opponent can currently make
-    const double OLD_THREATS = 1.0;
+    // multiplier for captures our opponent can currently make
+    const double OLD_THREATS = 3.37456005;
 
-    //multiplier for the captures our opponent will be able to make
-    const double NEW_THREATS = 1.0;
+    // multiplier for the captures our opponent will be able to make
+    const double NEW_THREATS = 2.67461549;
 
-    //weight to encourage castling
-    const double CASTLE_BONUS = 5.0; //defaiult is 1;
+    // weight to encourage castling
+    const double CASTLE_BONUS = 3.37456005; // default is 1;
 
     // ScapeGoat takes the current board and puts a bishop on a given square since we can have 10 bishops but 8 pawns
     // This is used to find all the pieces that control a given square
