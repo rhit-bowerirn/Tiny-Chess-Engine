@@ -78,7 +78,7 @@ public class MyBot : IChessBot
             return evaluateMove(b, m);
         }
         
-        double val = next.Max(n => -negamax(b, n, depth - 1));
+        double val = next.Max(n => -negamax(b, n, --depth));
         b.UndoMove(m);
         return val;
     }
@@ -243,7 +243,7 @@ public class MyBot : IChessBot
         {
             foreach (Piece p in pieceList)
             {
-                if (!p.IsKing && !(p.Square == currentSquare))
+                if (!(p.IsKing || p.Square == currentSquare))
                 {
                     foreach (Move defence in ScapeGoat(board, p.Square, !board.IsWhiteToMove).GetLegalMoves())
                     {
