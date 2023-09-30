@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -7,7 +7,7 @@ using ChessChallenge.API;
 
 //PrincessAtta V3
 //Atta V2 but the weights were evolved with a genetic algorithm
-public class MyBot : IChessBot
+public class AttaV3 : IChessBot
 {
 
     Func<PieceType, int> Material = Type => new int[] { 0, 1, 3, 3, 5, 9, 10 }[(int)Type];
